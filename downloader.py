@@ -27,6 +27,7 @@ def my_hook(d):
 # --- YouTube Audio Download using yt-dlp ---
 def downloadMP3(url, path, filename):
     filename = filename.replace('?', '')  # Clean filename
+    filename = filename.replace('/','')  # So it does not create folders.
     output_path = os.path.join(path, f"{filename}.%(ext)s")
 
     if not os.path.exists(os.path.join(path, f"{filename}.mp3")):
@@ -66,8 +67,19 @@ def ytMusicSearch(query):
 # --- Spotify Playlist to Song List ---
 def spotifyPlaylist(url):
     songs = []
+    offset = 0
     playlist_id = url.split("/")[-1].split("?")[0]
-    items = sp.playlist_tracks(playlist_id)["items"]
+    items = list()
+    items2 = list()
+    while True:
+        items2.clear()
+        items2 = sp.playlist_items(playlist_id,None,100,offset)["items"]
+        for item in items2:
+            items.append(item)
+        offset = offset + 100
+        if len(items2) < 100:
+            break
+    
     for item in items:
         name = item["track"]["name"]
         artist = item["track"]["artists"][0]["name"]
@@ -80,17 +92,24 @@ def downloadFromSpotifyPlaylist(url, path):
     start = time.time()
     os.makedirs(path, exist_ok=True)
     songs = spotifyPlaylist(url)
-
+    i = 0
     for name, artist in songs:
+        i = i+1
         print(f"\nSearching: {name} - {artist}")
-        yt_url = ytMusicSearch((name, artist))
-        if yt_url != "FAIL":
-            downloadMP3(yt_url, path, f"{name} - {artist}")
+        filename = f"{name} - {artist}.mp3"
+        filename = filename.replace('?', '')  # Clean filename
+        filename = filename.replace('/','')  # So it does not create folders.
+        if os.path.exists(os.path.join(path, f"{filename}")):
+            print("EXISTS")
         else:
-            failed.append(f"{name} - {artist}")
-
+            yt_url = ytMusicSearch((name, artist))
+            if yt_url != "FAIL":
+                downloadMP3(yt_url, path, f"{name} - {artist}")
+            else:
+                failed.append(f"{name} - {artist}")
+    
     end = time.time()
-    print(f"\nDownload complete in {round(end - start, 2)} seconds.")
+    print(f"\nDownload complete in {round(end - start, 2)} seconds. Processed {i} songs")
     if failed:
         print("Failed to download:")
         for f in failed:
